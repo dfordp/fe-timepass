@@ -1,4 +1,5 @@
 'use client'
+
 import {
   CommandDialog,
   CommandInput,
@@ -18,7 +19,7 @@ export default function CommandMenu({
 }) {
   const [open, setOpen] = useState(false)
 
-  // toggle on ⌘ K / Ctrl K
+  // ⌘K / Ctrl+K shortcut
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -32,15 +33,27 @@ export default function CommandMenu({
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Type a command or search…" />
+      <CommandInput placeholder="Type a command..." className="text-sm" />
       <CommandList>
-        <CommandGroup heading="General">
-          <CommandItem onSelect={() => { onNew(); setOpen(false) }}>
+        <CommandGroup heading="Quick Actions" className="text-neutral-500 text-xs uppercase tracking-wide">
+          <CommandItem
+            onSelect={() => {
+              onNew()
+              setOpen(false)
+            }}
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> New Chat
           </CommandItem>
-          <CommandItem onSelect={() => { onClear(); setOpen(false) }}>
+
+          <CommandItem
+            onSelect={() => {
+              onClear()
+              setOpen(false)
+            }}
+          >
             <Trash2 className="mr-2 h-4 w-4" /> Clear History
           </CommandItem>
+
           <CommandItem onSelect={() => setOpen(false)}>
             <Settings className="mr-2 h-4 w-4" /> Settings (coming soon)
           </CommandItem>

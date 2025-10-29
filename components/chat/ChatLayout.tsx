@@ -4,7 +4,6 @@ import { ChatWindow } from './ChatWindow'
 import { useChatClient } from '@/hooks/useChatClient'
 import PromptBar from './PromptBar'
 import { ChatSidebar } from './ChatSidebar'
-import ChatSidebarResponsive from './ChatSidebarResponsive'
 
 export function ChatLayout() {
   const {
@@ -15,13 +14,15 @@ export function ChatLayout() {
     createNew,
     send,
     sending,
+    streaming,   // 🧠 added streaming state from hook
     clearAll,
+    cancel,      // ✅ destructure cancel
   } = useChatClient()
 
   return (
-    <div className="flex h-screen bg-white text-neutral-900">
-      {/* Desktop sidebar */}
-      <div className="hidden md:block w-72">
+    <div className="flex h-dvh bg-white text-neutral-900">
+      {/* Sidebar (desktop) */}
+      <div className="hidden md:block w-72 border-r border-neutral-200">
         <ChatSidebar
           sessions={sessions}
           activeId={activeId}
@@ -30,21 +31,17 @@ export function ChatLayout() {
         />
       </div>
 
-      {/* Mobile sidebar */}
-      <ChatSidebarResponsive
-        sessions={sessions}
-        activeId={activeId}
-        setActiveId={setActiveId}
-        createNew={createNew}
-      />
+      {/* Main column */}
+      <div className="flex flex-1 flex-col min-h-0">
+        {/* Scrollable chat section */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ChatWindow session={active} sending={sending} streaming={streaming} />
+        </div>
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col">
-        <ChatWindow session={active} />
-        <PromptBar onSend={send} disabled={sending} />
+        {/* Input area */}
+        <PromptBar onSend={send} onCancel={cancel} disabled={sending} />
       </div>
 
-      {/* ⌘K Command Menu */}
       <CommandMenu onNew={createNew} onClear={clearAll} />
     </div>
   )

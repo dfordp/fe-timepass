@@ -1,56 +1,83 @@
 'use client'
-import ReactMarkdown from 'react-markdown'
+
+import { useEffect, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ChatSession } from '@/types/chat'
-import EmptyState from '../ui/EmptyState'
+import { MarkdownMessage } from '@/components/ui/MarkdownMessage'
 import Thinking from '../ui/Thinking'
-import { Button } from '@/components/ui/button'
-import { RefreshCw, Pencil } from 'lucide-react'
 
 export function ChatWindow({
   session,
   sending,
-  onRegenerate,
-  onEdit,
+  streaming,
 }: {
   session: ChatSession | null
   sending?: boolean
-  onRegenerate?: () => void
-  onEdit?: (id: string) => void
+  streaming?: boolean
 }) {
-  if (!session) return <div className="p-8 text-sm text-neutral-500">No chat</div>
+  const endRef = useRef<HTMLDivElement | null>(null)
+  const shouldShowThinking = !!sending && !streaming
 
-  return (
-    <ScrollArea className="flex-1">
-      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-        {!session.messages.length ? (
-          <EmptyState />
-        ) : (
-          session.messages.map((m) => (
-            <div key={m.id} className={m.role === 'user' ? 'text-black' : 'text-neutral-700'}>
-              <div className="flex items-center justify-between mb-1">
-                <div className="text-xs text-neutral-500">
-                  {m.role === 'user' ? 'You' : 'Assistant'}
-                </div>
-                {m.role === 'assistant' && (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                    <Button size="icon" variant="ghost" onClick={onRegenerate}>
-                      <RefreshCw className="w-3 h-3" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => onEdit?.(m.id)}>
-                      <Pencil className="w-3 h-3" />
-                    </Button>
-                  </div>
-                )}
-              </div>
+  // Auto-scroll on new messages or streaming state changes
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [session?.messages?.length, sending, streaming])
 
-              <div className="prose prose-neutral max-w-none text-sm">
-                <ReactMarkdown>{m.content}</ReactMarkdown>
-              </div>
-            </div>
-          ))
+  // No session loaded yet
+  if (!session) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-neutral-400 text-sm">
+        <p className="text-center px-4">Start your first conversation 👇</p>
+        {shouldShowThinking && (
+          <div className="mt-3">
+            <Thinking />
+          </div>
         )}
-        {sending && <Thinking />}
+      </div>
+    )
+  }
+
+  // Session exists but no messages yet
+  if (session.messages.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-neutral-400 text-sm">
+        <p className="text-center px-4">Ask me anything…</p>
+        {shouldShowThinking && (
+          <div className="mt-3">
+            <Thinking />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Chat thread
+  return (
+    <ScrollArea className="h-full">
+      <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
+        {session.messages.map((m) => (
+          <div
+            key={m.id}
+            className={`group flex flex-col gap-2 ${
+              m.role === 'user' ? 'items-end' : 'items-start'
+            }`}
+          >
+            <div
+              className={`rounded-2xl px-4 py-3 text-[15px] leading-relaxed border border-neutral-200 whitespace-pre-wrap shadow-sm transition-all duration-200 ${
+                m.role === 'user'
+                  ? 'bg-black text-white self-end'
+                  : 'bg-white text-neutral-900'
+              }`}
+            >
+              <MarkdownMessage content={m.content} />
+            </div>
+          </div>
+        ))}
+
+        {/* Thinking shows between send and first token */}
+        {shouldShowThinking && <Thinking />}
+
+        <div ref={endRef} />
       </div>
     </ScrollArea>
   )

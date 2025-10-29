@@ -1,15 +1,18 @@
 'use client'
-import { useEffect, useState } from 'react'
+
+import { useEffect, useState, useRef } from 'react'
 import { mockStream } from '@/lib/stream'
 import { loadSessions, saveSessions } from '@/lib/storage'
-import { ChatSession, Message } from '@/types/chat'
+import type { ChatSession, Message } from '@/types/chat'
 
 export function useChatClient() {
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [streaming, setStreaming] = useState(false) // ✅ new
+  const cancelRef = useRef<(() => void) | null>(null)
 
-  // 🧠 Load from localStorage on mount
+  // Load chats on mount
   useEffect(() => {
     const stored = loadSessions()
     if (stored.length) {
@@ -28,7 +31,7 @@ export function useChatClient() {
     }
   }, [])
 
-  // 💾 Persist whenever sessions change
+  // Persist chats
   useEffect(() => {
     if (sessions.length) saveSessions(sessions)
   }, [sessions])
@@ -40,7 +43,6 @@ export function useChatClient() {
     setSessions((prev) => prev.map((s) => (s.id === active.id ? fn(s) : s)))
   }
 
-  // 🆕 Create a brand-new empty chat session
   const createNew = () => {
     const newChat: ChatSession = {
       id: crypto.randomUUID(),
@@ -52,17 +54,36 @@ export function useChatClient() {
     setActiveId(newChat.id)
   }
 
-  // 🧹 Clear all chats
   const clearAll = () => {
     setSessions([])
     setActiveId(null)
     localStorage.removeItem('chat_sessions_v1')
   }
 
-  // 💬 Send message (mock streaming)
+  // ❌ Cancel streaming
+  const cancel = () => {
+    if (cancelRef.current) {
+      cancelRef.current()
+      cancelRef.current = null
+      setSending(false)
+      setStreaming(false)
+
+      updateActive((s) => {
+        const msgs = s.messages.map((m) => ({ ...m }))
+        const last = msgs[msgs.length - 1]
+        if (last?.role === 'assistant') last.content += ' [cancelled]'
+        return { ...s, messages: msgs }
+      })
+    }
+  }
+
+  // 💬 Send message
   const send = (prompt: string) => {
+    if (sending || streaming) return
     if (!active) return
+
     setSending(true)
+    setStreaming(false)
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -84,19 +105,31 @@ export function useChatClient() {
       messages: [...s.messages, userMsg, asstMsg],
     }))
 
-    const reply =
-      'Here is a **mock streamed answer** to your question.\n\n```ts\nconsole.log("Hello from a new chat!");\n```'
+    const reply = "Here is a **mock streamed answer** to your question:\n\n```typescript\nconsole.log(\"Hello from a new chat!\");\n```"
 
-    mockStream(reply, {
-      onToken: (token) =>
+
+    const cancelStream = mockStream(reply, {
+      delay: 25,
+      onToken: (token) => {
+        // mark streaming started
+        setStreaming(true)
         updateActive((s) => {
-          const msgs = [...s.messages]
-          const last = msgs[msgs.length - 1]
-          if (last.role === 'assistant') last.content += token
+          const msgs = s.messages.map((m) => ({ ...m }))
+          const lastIndex = msgs.length - 1
+          if (lastIndex >= 0 && msgs[lastIndex].role === 'assistant') {
+            msgs[lastIndex].content = (msgs[lastIndex].content || '') + token
+          }
           return { ...s, messages: msgs }
-        }),
-      onDone: () => setSending(false),
+        })
+      },
+      onDone: () => {
+        setSending(false)
+        setStreaming(false)
+        cancelRef.current = null
+      },
     })
+
+    cancelRef.current = cancelStream
   }
 
   return {
@@ -105,8 +138,10 @@ export function useChatClient() {
     activeId,
     setActiveId,
     createNew,
-    send,
-    sending,
     clearAll,
+    send,
+    cancel,
+    sending,
+    streaming, // ✅ exported
   }
 }
